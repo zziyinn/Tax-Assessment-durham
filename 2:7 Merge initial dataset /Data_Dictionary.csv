@@ -1,0 +1,21 @@
+Source Name,Variable (our name),Source
+BlockGroups,REID, 2024_10_All_Durham_BlockGroups
+BlockGroups,PIN, 2024_10_All_Durham_BlockGroups
+BlockGroups,PIN_EXT, 2024_10_All_Durham_BlockGroups
+BlockGroups,LOCATION_ADDR, 2024_10_All_Durham_BlockGroups
+BlockGroups,LAND_CLASS, 2024_10_All_Durham_BlockGroups
+BlockGroups,TOTAL_PROP_VALUE, 2024_10_All_Durham_BlockGroups
+BlockGroups,VCS, 2024_10_All_Durham_BlockGroups
+BlockGroups,name_2, 2024_10_All_Durham_BlockGroups
+BlockGroups,gid, 2024_10_All_Durham_BlockGroups
+BlockGroups,PERCENT_ASIAN, 2024_10_All_Durham_BlockGroups
+BlockGroups,PERCENT_BLACK, 2024_10_All_Durham_BlockGroups
+BlockGroups,PERCENT_HISPANIC, 2024_10_All_Durham_BlockGroups
+BlockGroups,PERCENT_WHITE, 2024_10_All_Durham_BlockGroups
+SalesInfo,REID,qualified-residential-sales
+SalesInfo,PIN,qualified-residential-sales
+SalesInfo,PIN_EXT,qualified-residential-sales
+SalesInfo,PRICE,qualified-residential-sales
+SalesInfo,SALE_DATE,qualified-residential-sales
+SalesInfo,VCS,qualified-residential-sales
+SalesInfo,LOCATION_ADDR,qualified-residential-sales
