@@ -1,0 +1,209 @@
+
+```{r}
+library(dplyr)
+library(lubridate)  
+library(tidyr)      
+
+# Load data
+df <- read.csv("Durham_BlockGroups_with_Sales_Merged.csv")
+
+```
+
+
+```{r}
+# The latest sales records
+df_latest <- df %>%
+  # Convert empty SALE_DATE strings to NA
+  mutate(SALE_DATE = na_if(SALE_DATE, "")) %>%
+  # Keep only rows with a sale record
+  filter(!is.na(SALE_DATE)) %>%
+  # Convert SALE_DATE to date format
+  mutate(SALE_DATE = as.Date(SALE_DATE)) %>%
+  # Remove rows where TOTAL_PROP_VALUE is empty
+  filter(!is.na(TOTAL_PROP_VALUE)) %>%
+  # Group by REID and keep only the latest sales record
+  group_by(REID) %>%
+  slice_max(order_by = SALE_DATE, n = 1) %>%
+  # Ungroup the data
+  ungroup()
+```
+
+
+
+```{r}
+# Calculate the median sales price for each year
+yearly_median <- df_latest %>%
+  # Extract the year from SALE_DATE
+  mutate(year = year(SALE_DATE)) %>%
+  # Group data by year
+  group_by(year) %>%
+  # Calculate median sales price per year
+  summarise(MED_PRICE_BY_YEAR = median(PRICE)) %>%
+  # Get the median price for the year 2024
+  mutate(
+    MAX_YEAR_MED_PRICE = MED_PRICE_BY_YEAR[year == 2024],
+    # Calculate the adjustment factor
+    adjustment_factor = 1 + ((MAX_YEAR_MED_PRICE - MED_PRICE_BY_YEAR) / MED_PRICE_BY_YEAR)
+  )
+
+# Apply the adjustment factor to the original data
+df_adjusted <- df_latest %>%
+  # Extract the year from SALE_DATE
+  mutate(year = year(SALE_DATE)) %>%
+  # Join the yearly median data on year
+  left_join(yearly_median, by = "year") %>%
+  # Calculate the adjusted price and adjusted sales ratio
+  mutate(
+    ADJ_PRICE = PRICE * adjustment_factor,
+    ADJ_SALES_RATIO = TOTAL_PROP_VALUE / ADJ_PRICE
+  )
+
+
+print(select(yearly_median, year, adjustment_factor))
+summary(select(df_adjusted, PRICE, ADJ_PRICE, ADJ_SALES_RATIO))
+
+```
+
+
+```{r}
+# Unadjusted sales ratio (for dashboard display)
+df_display_ratios <- df_latest %>%
+  mutate(
+    SALES_RATIO = TOTAL_PROP_VALUE / PRICE
+  )
+```
+
+
+```{r}
+# Analyze by neighborhood and VCS groups
+df_analyzed <- df_adjusted %>%
+  # Neighborhood level analysis
+  group_by(name_2) %>%
+  mutate(
+    N_MED_ADJ_SALES_RATIO = median(ADJ_SALES_RATIO, na.rm = TRUE),
+    N_ABS_ADJ_SALES_RATIO = ADJ_SALES_RATIO - N_MED_ADJ_SALES_RATIO,
+    N_OVER_UNDER = case_when(
+      is.na(N_ABS_ADJ_SALES_RATIO) ~ NA_character_,
+      N_ABS_ADJ_SALES_RATIO < -0.05 ~ "Underassessed",
+      N_ABS_ADJ_SALES_RATIO > 0.05 ~ "Overassessed",
+      TRUE ~ "Accurate"
+    ),
+    N_SALES_QUARTILE = paste0("Q", ntile(ADJ_PRICE, 4))
+  ) %>%
+  ungroup() %>%
+  # VCS group level analysis
+  group_by(VCS_block) %>%
+  mutate(
+    VCS_MED_ADJ_SALES_RATIO = median(ADJ_SALES_RATIO, na.rm = TRUE),
+    VCS_ABS_ADJ_SALES_RATIO = ADJ_SALES_RATIO - VCS_MED_ADJ_SALES_RATIO,
+    VCS_OVER_UNDER = case_when(
+      is.na(VCS_ABS_ADJ_SALES_RATIO) ~ NA_character_,
+      VCS_ABS_ADJ_SALES_RATIO < -0.05 ~ "Underassessed",
+      VCS_ABS_ADJ_SALES_RATIO > 0.05 ~ "Overassessed",
+      TRUE ~ "Accurate"
+    ),
+    VCS_SALES_QUARTILE = paste0("Q", ntile(ADJ_PRICE, 4))
+  ) %>%
+  ungroup()
+```
+
+
+
+```{r}
+# The unadjusted median sales ratio for dashboard
+neighborhood_display_ratios <- df_display_ratios %>%
+  group_by(name_2) %>%
+  summarise(
+    N_DISPLAY_MED_SALES_RATIO = median(SALES_RATIO, na.rm = TRUE)
+  ) %>%
+  ungroup()
+
+vcs_display_ratios <- df_display_ratios %>%
+  group_by(VCS_block) %>%
+  summarise(
+    VCS_DISPLAY_MED_SALES_RATIO = median(SALES_RATIO, na.rm = TRUE)
+  ) %>%
+  ungroup()
+```
+
+```{r}
+# Create neighborhood-level aggregated data
+neighborhood_summary <- df_analyzed %>%
+  group_by(name_2, gid) %>%
+  summarise(
+    N_COUNT = n(),
+    N_MED_ADJ_SALES_PRICE = median(ADJ_PRICE, na.rm = TRUE),
+    N_MED_ADJ_SALES_RATIO = median(ADJ_SALES_RATIO, na.rm = TRUE),
+    N_PERCENT_ASIAN = mean(PERCENT_ASIAN, na.rm = TRUE),
+    N_PERCENT_BLACK = mean(PERCENT_BLACK, na.rm = TRUE),
+    N_PERCENT_HISPANIC = mean(PERCENT_HISPANIC, na.rm = TRUE),
+    N_PERCENT_WHITE = mean(PERCENT_WHITE, na.rm = TRUE)
+  ) %>%
+  ungroup() %>%
+  # Add unadjusted sales ratios
+  left_join(neighborhood_display_ratios, by = "name_2")
+
+# Create VCS group-level aggregated data
+vcs_summary <- df_analyzed %>%
+  group_by(VCS_block) %>%
+  summarise(
+    VCS_COUNT = n(),
+    VCS_MED_ADJ_SALES_PRICE = median(ADJ_PRICE, na.rm = TRUE),
+    VCS_MED_ADJ_SALES_RATIO = median(ADJ_SALES_RATIO, na.rm = TRUE),
+    VCS_PERCENT_ASIAN = mean(PERCENT_ASIAN, na.rm = TRUE),
+    VCS_PERCENT_BLACK = mean(PERCENT_BLACK, na.rm = TRUE),
+    VCS_PERCENT_HISPANIC = mean(PERCENT_HISPANIC, na.rm = TRUE),
+    VCS_PERCENT_WHITE = mean(PERCENT_WHITE, na.rm = TRUE)
+  ) %>%
+  ungroup() %>%
+  # Add unadjusted sales ratios
+  left_join(vcs_display_ratios, by = "VCS_block")
+
+# Filter out small sample sizes
+min_sample_size <- 5
+neighborhood_summary_filtered <- neighborhood_summary %>%
+  filter(N_COUNT >= min_sample_size)
+
+vcs_summary_filtered <- vcs_summary %>%
+  filter(VCS_COUNT >= min_sample_size)
+
+# Create categorized statistical summaries
+neighborhood_quartile_summary <- df_analyzed %>%
+  filter(!is.na(N_OVER_UNDER), !is.na(N_SALES_QUARTILE)) %>%
+  group_by(name_2) %>%
+  summarise(
+    TOTAL_SALES = n(),
+    Q1_COUNT = sum(N_SALES_QUARTILE == "Q1"),
+    Q2_COUNT = sum(N_SALES_QUARTILE == "Q2"),
+    Q3_COUNT = sum(N_SALES_QUARTILE == "Q3"),
+    Q4_COUNT = sum(N_SALES_QUARTILE == "Q4"),
+    UNDER_COUNT = sum(N_OVER_UNDER == "Underassessed"),
+    OVER_COUNT = sum(N_OVER_UNDER == "Overassessed"),
+    ACCURATE_COUNT = sum(N_OVER_UNDER == "Accurate")
+  ) %>%
+  filter(TOTAL_SALES >= min_sample_size) %>%
+  arrange(desc(TOTAL_SALES))
+
+vcs_quartile_summary <- df_analyzed %>%
+  filter(!is.na(VCS_OVER_UNDER), !is.na(VCS_SALES_QUARTILE)) %>%
+  group_by(VCS_block) %>%
+  summarise(
+    TOTAL_SALES = n(),
+    Q1_COUNT = sum(VCS_SALES_QUARTILE == "Q1"),
+    Q2_COUNT = sum(VCS_SALES_QUARTILE == "Q2"),
+    Q3_COUNT = sum(VCS_SALES_QUARTILE == "Q3"),
+    Q4_COUNT = sum(VCS_SALES_QUARTILE == "Q4"),
+    UNDER_COUNT = sum(VCS_OVER_UNDER == "Underassessed"),
+    OVER_COUNT = sum(VCS_OVER_UNDER == "Overassessed"),
+    ACCURATE_COUNT = sum(VCS_OVER_UNDER == "Accurate")
+  ) %>%
+  filter(TOTAL_SALES >= min_sample_size) %>%
+  arrange(desc(TOTAL_SALES))
+
+# Save all results
+write.csv(neighborhood_summary_filtered, "neighborhood_summary.csv", row.names = FALSE)
+write.csv(vcs_summary_filtered, "vcs_summary.csv", row.names = FALSE)
+write.csv(neighborhood_quartile_summary, "neighborhood_quartile_summary.csv", row.names = FALSE)
+write.csv(vcs_quartile_summary, "vcs_quartile_summary.csv", row.names = FALSE)
+```
+
