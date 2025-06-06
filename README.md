@@ -42,7 +42,7 @@ In collaboration with **DataWorks NC**, our team aims to highlight neighborhoods
 
 We created a comprehensive, interactive Tableau dashboard that visualizes tax burden disparities across Durham County.
 
-🔗 **[Explore the Tableau Dashboard](https://public.tableau.com/app/profile/ziyin.zheng/viz/visualization_17491794421990/Mapcompare?publish=yes)**
+🔗 **[Explore the Tableau Dashboard](https://public.tableau.com/app/profile/stephanie.johnston/viz/FairSharePropertyTaxDashboard/Dashboard)**
 This dashboard helps users identify neighborhoods where homeowners may be overassessed and encourages fair taxation advocacy. It's designed to be intuitive, actionable, and informative for policymakers, residents, and community organizers.
 
 ---
